@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import TaskCard from '../component/TaskCard';
 import BottomNav from '../component/BottomNav';
-import ActiveTaskManager from '../component/ActiveTaskManager';
 
 const initialTasks = [
     { id: 1, title: 'Drink 2L Water', desc: 'Stay hydrated all day', accepted: false },
@@ -25,7 +24,6 @@ const TaskPage = () => {
             </header>
 
             <main className="flex-1 overflow-auto p-6">
-                <ActiveTaskManager />
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                     {initialTasks.map((task, i) => (
                         <TaskCard
@@ -38,7 +36,6 @@ const TaskPage = () => {
                     ))}
                 </div>
             </main>
-            <BottomNav active="tasks" />
         </div >
     );
 }

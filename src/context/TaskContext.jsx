@@ -4,9 +4,7 @@ const TaskContext = createContext();
 
 export function TaskProvider({ children }) {
     const [activeTasks, setActiveTasks] = useState([]);
-
     useEffect(() => {
-        // Fetch initial tasks from an API or local storage
         const timer = setInterval(() => {
             setActiveTasks(tasks =>
                 tasks.map(t => ({
