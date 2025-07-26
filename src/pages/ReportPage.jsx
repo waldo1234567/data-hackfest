@@ -62,7 +62,7 @@ const ReportPage = () => {
                     </LineChart>
                 </ResponsiveContainer>
             ),
-            overview: AIOverview['Habit Completions Trend (Daily)'],
+            overview: AIOverview[0],
             reverse: false
         },
         {
@@ -86,7 +86,7 @@ const ReportPage = () => {
                     </LineChart>
                 </ResponsiveContainer>
             ),
-            overview: AIOverview['Overall Habit Frequency Insights'],
+            overview: AIOverview[1],
             reverse: false
         },
         {
@@ -107,7 +107,7 @@ const ReportPage = () => {
                     </BarChart>
                 </ResponsiveContainer>
             ),
-            overview: AIOverview['Time Spent Per Habit Insights'],
+            overview: AIOverview[2],
             reverse: false
         },
         {
@@ -135,7 +135,7 @@ const ReportPage = () => {
                     </PieChart>
                 </ResponsiveContainer>
             ),
-            overview: AIOverview['Total Duration Trend (Daily)'],
+            overview: AIOverview[3],
             reverse: false
         }
     ];
@@ -180,62 +180,51 @@ const ReportPage = () => {
             <header className="px-6 py-4 bg-black border-b border-gray-800">
                 <h2 className="text-3xl font-bold">Your Habit Report</h2>
             </header>
+
             {slides.map((slide, i) => {
-                const reverse = i % 2 === 1;
                 const chartVars = getVariants(i, true);
                 const textVars = getVariants(i, false);
 
                 return (
                     <section
                         key={i}
-                        className="h-screen snap-start flex items-center justify-center p-6"
+                        className="h-screen snap-start flex flex-col items-center justify-center p-6 gap-8"
                     >
-                        <div className={`flex w-full max-w-6xl ${reverse ? 'flex-row-reverse' : 'flex-row'} gap-12`}>
+                        {/* 1) Chart at the top */}
+                        <motion.div
+                            className="w-full max-w-4xl"
+                            initial={chartVars.initial}
+                            whileInView={chartVars.animate}
+                            exit={chartVars.exit}
+                            transition={chartVars.transition}
+                            viewport={{ once: false, amount: 0.5 }}
+                        >
+                            <ChartCard title={slide.title}>
+                                <ResponsiveContainer width="100%" height={350}>
+                                    {slide.component}
+                                </ResponsiveContainer>
+                            </ChartCard>
+                        </motion.div>
 
-                            {/* Chart, now twice the flex and taller */}
-                            <motion.div
-                                className="flex-2"
-                                initial={chartVars.initial}
-                                whileInView={chartVars.animate}
-                                exit={chartVars.exit}
-                                transition={chartVars.transition}
-                                viewport={{ once: false, amount: 0.5 }}
+                        {/* 2) Text underneath */}
+                        <motion.div
+                            className="w-full max-w-5xl p-4"
+                            initial={textVars.initial}
+                            whileInView={textVars.animate}
+                            exit={textVars.exit}
+                            transition={textVars.transition}
+                            viewport={{ once: false, amount: 0.5 }}
+                        >
+                            <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
                             >
-                                <ChartCard title={slide.title}>
-                                    <ResponsiveContainer width="100%" height={350}>
-                                        {slide.component.type === LineChart
-                                            ? React.cloneElement(slide.component, { data: slide.component.props.data })
-                                            : slide.component}
-                                    </ResponsiveContainer>
-                                </ChartCard>
-                            </motion.div>
-
-                            {/* AI Overview Text */}
-                            <motion.div
-                                className="flex-1 p-6 flex items-center justify-center"
-                                initial={textVars.initial}
-                                whileInView={textVars.animate}
-                                exit={textVars.exit}
-                                transition={textVars.transition}
-                                viewport={{ once: false, amount: 0.5 }}
-                            >
-                                <div
-                                    className={`
-      prose prose-invert max-w-none
-      ${reverse ? 'text-left' : 'text-right'}
-    `}
-                                >
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                        {slide.overview}
-                                    </ReactMarkdown>
-                                </div>
-                            </motion.div>
-
-                        </div>
+                                {slide.overview}
+                            </ReactMarkdown>
+                        </motion.div>
                     </section>
                 );
             })}
-        </div >
+        </div>
     );
 }
 
