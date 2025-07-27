@@ -54,7 +54,20 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy
+          // change this to your actual frontend URL in production
+          .WithOrigins("http://localhost:5173")
+          .AllowAnyMethod()
+          .AllowAnyHeader()
+          // only if you need to send cookies or auth credentials:
+          //.AllowCredentials()
+          ;
+    });
+});
 // Configure PostgreSQL with Npgsql
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -63,19 +76,18 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-
-        options.Authority = builder.Configuration["Auth0:Domain"];
+        options.Authority = $"https://{builder.Configuration["Auth0:Domain"]}";
         options.Audience = builder.Configuration["Auth0:Audience"];
         options.RequireHttpsMetadata = false; // Disable only in dev
-        // options.TokenValidationParameters = new TokenValidationParameters
-        // {
-        //     ValidateIssuer = true,
-        //     ValidIssuer = $"https://{builder.Configuration["Auth0:Domain"]}",
-        //     ValidateAudience = true,
-        //     ValidateLifetime = true,
-        //     NameClaimType = ClaimTypes.NameIdentifier,
-        //     RoleClaimType = ClaimTypes.Role
-        // };
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = $"https://{builder.Configuration["Auth0:Domain"]}",
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            NameClaimType = ClaimTypes.NameIdentifier,
+            RoleClaimType = ClaimTypes.Role
+        };
     });
 
 builder.Services.AddAuthorization(options =>
@@ -115,7 +127,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
+app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -238,7 +250,7 @@ void SeedData(ApplicationDbContext context)
                     }
 
 
-                    var status = random.Next(0, 10) < 8 ? 1 : 0; // ~80% complete, ~20% in progress/skipped
+                    var status = random.Next(0, 10) < 8 ? 1 : 2; // ~80% complete, ~20% in progress/skipped
 
                     recordsToSeed.Add(new Record
                     {

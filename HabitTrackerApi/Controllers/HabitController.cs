@@ -43,6 +43,7 @@ namespace HabitTrackerApi.Controllers
             {
                 // Get the User entity from the database using our consolidated logic
                 var user = await GetCurrentUserFromDbAsync();
+                if (user == null) return null;
                 return user?.Id; // Return the GUID Id from the fetched User object
             }
             catch (InvalidOperationException ex) // Catch the specific exception from GetCurrentUserFromDbAsync
@@ -94,20 +95,33 @@ namespace HabitTrackerApi.Controllers
                 // won't be available from HttpContext.User unless you explicitly set them in a fake token.
                 // For simple testing, you might use hardcoded values or generate placeholders.
                 Console.WriteLine($"DEBUG: Provisioning new user with Auth0Id: {auth0Id}");
-                user = new User
+                auth0Id = User.FindFirst(ClaimTypes.Email)?.Value;
+                if (auth0Id == null)
                 {
-                    Id = Guid.NewGuid(),
-                    Auth0Id = auth0Id,
-                    Email = $"{auth0Id.Replace("|", "_")}@example.com", // Placeholder email
-                    EmailVerified = false,
-                    Name = $"Test User {auth0Id.Replace("auth0|", "")}", // Placeholder name
-                    Picture = "",
-                    CreatedAt = DateTime.UtcNow,
-                    LastLogin = DateTime.UtcNow
+                    return null;
+                }
 
-                };
-                _context.Users.Add(user);
-                await _context.SaveChangesAsync();
+                var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Auth0Id == auth0Id);
+
+
+                if (existingUser == null)
+                {
+                    // Create new user record
+                    var newUser = new User
+                    {
+                        Id = Guid.NewGuid(),
+                        Auth0Id = auth0Id,
+                        Email = User.FindFirst(ClaimTypes.Email)?.Value ?? $"{auth0Id.Replace("|", "_")}@example.com",
+                        EmailVerified = bool.Parse(User.FindFirst("email_verified")?.Value ?? "false"),
+                        Name = User.FindFirst("name")?.Value ?? $"User {auth0Id.Replace("auth0|", "")}",
+                        Picture = User.FindFirst("picture")?.Value ?? "", // Auth0 provides this
+                        TotalXp = 0,
+                        CreatedAt = DateTime.UtcNow,
+                        LastLogin = DateTime.UtcNow
+                    };
+                    _context.Users.Add(newUser);
+                    await _context.SaveChangesAsync();
+                }
             }
             else
             {
@@ -119,44 +133,6 @@ namespace HabitTrackerApi.Controllers
 
             return user;
         }
-
-        /// <summary>
-        /// Register the user
-        /// </summary>
-        [HttpPost("Register")]
-        public async Task<IActionResult> Register()
-        {
-            var auth0Id = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (auth0Id == null)
-            {
-                return NotFound("Auth0 not found");
-            }
-
-            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Auth0Id == auth0Id);
-
-
-            if (existingUser == null)
-            {
-                // Create new user record
-                var newUser = new User
-                {
-                    Id = Guid.NewGuid(),
-                    Auth0Id = auth0Id,
-                    Email = User.FindFirst(ClaimTypes.Email)?.Value ?? $"{auth0Id.Replace("|", "_")}@example.com",
-                    EmailVerified = bool.Parse(User.FindFirst("email_verified")?.Value ?? "false"),
-                    Name = User.FindFirst("name")?.Value ?? $"User {auth0Id.Replace("auth0|", "")}",
-                    Picture = User.FindFirst("picture")?.Value ?? "", // Auth0 provides this
-                    TotalXp = 0,
-                    CreatedAt = DateTime.UtcNow,
-                    LastLogin = DateTime.UtcNow
-                };
-                _context.Users.Add(newUser);
-                await _context.SaveChangesAsync();
-                return Ok(new { message = "Registration complete!", user = newUser });
-            }
-            return Ok(new { message = "Already registered", user = existingUser });
-        }
-
         // --- Helper method to format TimeSpan to HH:MM:SS ---
         private string FormatTimeSpan(TimeSpan duration)
         {
@@ -168,7 +144,7 @@ namespace HabitTrackerApi.Controllers
         /// Retrieves a map of habit relations and frequencies for the authenticated user.
         /// </summary>
         [HttpPost("GetRecords")]
-        [Authorize]
+        // [Authorize] // TEMPORARILY DISABLED FOR TESTING
         public async Task<ActionResult<GetRecordsDto>> GetRecords()
         {
             var userId = await GetUserIdAsync();
@@ -299,6 +275,18 @@ namespace HabitTrackerApi.Controllers
                 .ToListAsync();
 
             return Ok(new GetHabitsResponseDto { Habits = habits });
+        }
+
+        [AllowAnonymous]
+        [HttpGet("debug/token")]
+        public IActionResult DebugToken([FromHeader(Name = "Authorization")] string authHeader)
+        {
+            return Ok(new
+            {
+                ReceivedHeader = authHeader,
+                HasValue = !string.IsNullOrEmpty(authHeader),
+                IsBearerFormat = authHeader?.StartsWith("Bearer ")
+            });
         }
 
         /// <summary>
@@ -665,7 +653,7 @@ namespace HabitTrackerApi.Controllers
         /// <returns>HTTP 204 No Content on success, 404 if habit not found, 409 if already in progress.</returns>
         [HttpPost("StartRecord")]
         [Authorize]
-        public async Task<ActionResult> StartRecord([FromBody] StartRecordDtoRequest request)
+        public async Task<ActionResult<StartRecordResponseDto>> StartRecord([FromBody] StartRecordDtoRequest request)
         {
             var userId = await GetUserIdAsync();
             if (!userId.HasValue)
@@ -711,10 +699,12 @@ namespace HabitTrackerApi.Controllers
             _context.Records.Add(newRecord);
             await _context.SaveChangesAsync();
 
-            // Return 204 No Content.
-            // This tells the frontend: "Success, but there's no data in the response body."
-            // The frontend can then proceed to call GetRecords or update its UI based on this success.
-            return NoContent();
+            var response = new StartRecordResponseDto
+            {
+                RecordId = newRecord.Id
+            };
+
+            return Ok(response);
 
         }
 

@@ -9,11 +9,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace HabitTrackerApi.Data.Migrations
+namespace HabitTrackerApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250726092823_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20250727104710_init")]
+    partial class init
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -62,7 +62,8 @@ namespace HabitTrackerApi.Data.Migrations
                     b.Property<Guid>("HabitId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("StartTime")
+                    b.Property<DateTime?>("StartTime")
+                        .IsRequired()
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
@@ -115,6 +116,9 @@ namespace HabitTrackerApi.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<long>("TotalXp")
+                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
