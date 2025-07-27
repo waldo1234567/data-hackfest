@@ -16,7 +16,6 @@ namespace HabitTrackerApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    // [Authorize]
     public class HabitController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -52,6 +51,7 @@ namespace HabitTrackerApi.Controllers
                 return null; // Or handle as appropriate, e.g., throw a custom exception
             }
         }
+
         private async Task<User> GetCurrentUserFromDbAsync()
         {
             string auth0Id = null;
@@ -104,6 +104,7 @@ namespace HabitTrackerApi.Controllers
                     Picture = "",
                     CreatedAt = DateTime.UtcNow,
                     LastLogin = DateTime.UtcNow
+
                 };
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
@@ -119,6 +120,43 @@ namespace HabitTrackerApi.Controllers
             return user;
         }
 
+        /// <summary>
+        /// Register the user
+        /// </summary>
+        [HttpPost("Register")]
+        public async Task<IActionResult> Register()
+        {
+            var auth0Id = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (auth0Id == null)
+            {
+                return NotFound("Auth0 not found");
+            }
+
+            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Auth0Id == auth0Id);
+
+
+            if (existingUser == null)
+            {
+                // Create new user record
+                var newUser = new User
+                {
+                    Id = Guid.NewGuid(),
+                    Auth0Id = auth0Id,
+                    Email = User.FindFirst(ClaimTypes.Email)?.Value ?? $"{auth0Id.Replace("|", "_")}@example.com",
+                    EmailVerified = bool.Parse(User.FindFirst("email_verified")?.Value ?? "false"),
+                    Name = User.FindFirst("name")?.Value ?? $"User {auth0Id.Replace("auth0|", "")}",
+                    Picture = User.FindFirst("picture")?.Value ?? "", // Auth0 provides this
+                    TotalXp = 0,
+                    CreatedAt = DateTime.UtcNow,
+                    LastLogin = DateTime.UtcNow
+                };
+                _context.Users.Add(newUser);
+                await _context.SaveChangesAsync();
+                return Ok(new { message = "Registration complete!", user = newUser });
+            }
+            return Ok(new { message = "Already registered", user = existingUser });
+        }
+
         // --- Helper method to format TimeSpan to HH:MM:SS ---
         private string FormatTimeSpan(TimeSpan duration)
         {
@@ -130,6 +168,7 @@ namespace HabitTrackerApi.Controllers
         /// Retrieves a map of habit relations and frequencies for the authenticated user.
         /// </summary>
         [HttpPost("GetRecords")]
+        [Authorize]
         public async Task<ActionResult<GetRecordsDto>> GetRecords()
         {
             var userId = await GetUserIdAsync();
@@ -246,6 +285,7 @@ namespace HabitTrackerApi.Controllers
         /// Retrieves a list of all habits.
         /// </summary>
         [HttpPost("GetHabits")]
+        [Authorize]
         public async Task<ActionResult<GetHabitsResponseDto>> GetHabits()
         {
             var habits = await _context.Habits
@@ -265,6 +305,7 @@ namespace HabitTrackerApi.Controllers
         /// Retrieves a list of unfinished records for the authenticated user.
         /// </summary>
         [HttpPost("GetUnfinishedRecords")] // Changed from GetUnfinished
+        [Authorize]
         public async Task<ActionResult<GetUnfinishedRecordsResponseDto>> GetUnfinishedRecords()
         {
             var userId = await GetUserIdAsync();
@@ -352,6 +393,7 @@ namespace HabitTrackerApi.Controllers
         /// Provides a customizable statistics report about the user's habit tracking.
         /// </summary>
         [HttpPost("Statistics")]
+        [Authorize]
         public async Task<ActionResult<StatisticsResponseDto>> Statistics([FromBody] StatisticsRequestDto request)
         {
             var userId = await GetUserIdAsync();
@@ -586,6 +628,7 @@ namespace HabitTrackerApi.Controllers
         /// </summary>
         /// <returns>A list of habit records with associated habit names, sorted by start time.</returns>
         [HttpPost("HistoryTimeline")] // Using POST consistent with other APIs, though GET could also work
+        [Authorize]
         public async Task<ActionResult<HistoryTimelineResponseDto>> HistoryTimeline()
         {
             var userId = await GetUserIdAsync();
@@ -613,6 +656,151 @@ namespace HabitTrackerApi.Controllers
 
             // Return the list wrapped in the response DTO
             return Ok(new HistoryTimelineResponseDto { Timeline = records });
+        }
+
+        /// <summary>
+        /// Creates a new unfinished habit record for the user, initiated by the frontend.
+        /// </summary>
+        /// <param name="request">The habit ID and an optional start time (from frontend).</param>
+        /// <returns>HTTP 204 No Content on success, 404 if habit not found, 409 if already in progress.</returns>
+        [HttpPost("StartRecord")]
+        [Authorize]
+        public async Task<ActionResult> StartRecord([FromBody] StartRecordDtoRequest request)
+        {
+            var userId = await GetUserIdAsync();
+            if (!userId.HasValue)
+            {
+                return Unauthorized("User not found or not authenticated.");
+            }
+
+            // Verify the habit exists 
+            var habit = await _context.Habits.FindAsync(request.HabitId);
+            if (habit == null)
+            {
+                return NotFound("Habit not found");
+            }
+
+            // Optional: Check for an already existing unfinished record for this habit.
+            // This prevents starting a habit if one is already in progress.
+            var existingUnfinishedRecord = await _context.Records
+                .FirstOrDefaultAsync(r => r.UserId == userId.Value && r.HabitId == request.HabitId && r.Status == 0);
+
+            if (existingUnfinishedRecord != null)
+            {
+                // If a record is already in progress, return 409 Conflict.
+                // The frontend should handle this by perhaps showing an error or just ignoring the "start" action.
+                return Conflict("This habit already has an unfinished record in progress. Please finish it first.");
+            }
+
+            // Determine the actual start time: use provided time, otherwise use UTCNow.
+            // It's crucial to store all DateTime values in the database as UTC.
+            DateTime actualStartTime = request.StartTime.HasValue
+                ? request.StartTime.Value.ToUniversalTime() // Convert to UTC if a value is provided
+                : DateTime.UtcNow; // Default to current UTC time if not provided
+
+            var newRecord = new Record
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId.Value,
+                HabitId = request.HabitId,
+                StartTime = actualStartTime,
+                EndTime = null,
+                Status = 0
+            };
+
+            _context.Records.Add(newRecord);
+            await _context.SaveChangesAsync();
+
+            // Return 204 No Content.
+            // This tells the frontend: "Success, but there's no data in the response body."
+            // The frontend can then proceed to call GetRecords or update its UI based on this success.
+            return NoContent();
+
+        }
+
+        /// <summary>
+        /// Updates an unfinished habit record for the user, initiated by the frontend.
+        /// </summary>
+        /// <param name="request">The record ID , end time and status (from frontend).</param>
+        /// <returns>HTTP 204 No Content on success, 404 if habit not found.</returns>
+        [HttpPost("UpdateRecord")]
+        [Authorize]
+        public async Task<ActionResult> UpdateRecord([FromBody] UpdateRecordDtoRequest request)
+        {
+            var userId = await GetUserIdAsync();
+            if (!userId.HasValue)
+            {
+                return Unauthorized("User not found or not authenticated.");
+            }
+
+            // Verify the habit exists 
+            var record = await _context.Records.FindAsync(request.RecordId);
+            if (record == null)
+            {
+                return NotFound("Record not found");
+            }
+
+            var habit = await _context.Habits.FindAsync(record.HabitId);
+            if (habit == null)
+            {
+                return NotFound("Habit not found");
+            }
+
+            record.EndTime = request.EndTime;
+            record.Status = (request.status == 0) ? 2 : 1;
+
+            if (request.status == 1)
+            {
+                var user = await _context.Users.FindAsync(userId.Value);
+                if (user == null)
+                {
+                    return NotFound("User not found");
+                }
+                user.TotalXp += habit.XpAmount;
+            }
+
+            await _context.SaveChangesAsync();
+            // Return 204 No Content.
+            // This tells the frontend: "Success, but there's no data in the response body."
+            // The frontend can then proceed to call GetRecords or update its UI based on this success.
+            return NoContent();
+        }
+
+        /// <summary>
+        /// Queries the database for all unfinished habit records for the authenticated user.
+        /// </summary>
+        /// <returns>A list of active records with their habit details.</returns>
+        [HttpPost("ActiveRecords")]
+        [Authorize]
+        public async Task<ActionResult<ActiveRecordsDto>> ActiveRecords()
+        {
+            var userId = await GetUserIdAsync();
+            if (!userId.HasValue)
+            {
+                return Unauthorized("User not found or not authenticated.");
+            }
+
+            // LINQ query to get active records
+            var activeRecords = await _context.Records
+                .Where(r => r.UserId == userId.Value && r.Status == 0)
+                .Include(r => r.Habit)
+                .Select(r => new ActiveRecordDto
+                {
+                    RecordId = r.Id,
+                    HabitId = r.HabitId,
+                    HabitName = r.Habit.Name,
+                    StartTime = r.StartTime,
+                    XpAmount = r.Habit.XpAmount
+                })
+                .ToListAsync(); // Execute the query and get the list
+
+            // Wrap the list in the ActiveRecordsDto
+            var response = new ActiveRecordsDto
+            {
+                ActiveRecords = activeRecords
+            };
+
+            return Ok(response); // Return 200 OK with the DTO
         }
     }
 }

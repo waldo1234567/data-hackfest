@@ -53,28 +53,28 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
+
+
 // Configure PostgreSQL with Npgsql
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-// Configure Auth0 Authentication (JWT Bearer)
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.Authority = builder.Configuration["Auth0:Domain"]; // Your Auth0 Domain
-        options.Audience = builder.Configuration["Auth0:Audience"]; // Your Auth0 API Audience
 
-        // IMPORTANT: For local testing without a real Auth0 setup, you might temporarily relax validation.
-        // In production, ensure these are robustly configured and validated.
-        // options.RequireHttpsMetadata = false;
-        // options.SaveToken = true;
+        options.Authority = builder.Configuration["Auth0:Domain"];
+        options.Audience = builder.Configuration["Auth0:Audience"];
+        options.RequireHttpsMetadata = false; // Disable only in dev
         // options.TokenValidationParameters = new TokenValidationParameters
         // {
-        //     ValidateIssuerSigningKey = false,
-        //     ValidateIssuer = false,
-        //     ValidateAudience = false,
-        //     ValidateLifetime = false,
+        //     ValidateIssuer = true,
+        //     ValidIssuer = $"https://{builder.Configuration["Auth0:Domain"]}",
+        //     ValidateAudience = true,
+        //     ValidateLifetime = true,
+        //     NameClaimType = ClaimTypes.NameIdentifier,
+        //     RoleClaimType = ClaimTypes.Role
         // };
     });
 

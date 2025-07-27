@@ -1,4 +1,3 @@
-// Models/User.cs
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -25,6 +24,8 @@ namespace HabitTrackerApi.Models
         [Required]
         [StringLength(255)]
         public string Email { get; set; } = string.Empty;
+
+        public long TotalXp { get; set; } = 0;
 
         public bool EmailVerified { get; set; }
 
