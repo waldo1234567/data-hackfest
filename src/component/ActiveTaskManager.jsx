@@ -11,8 +11,9 @@ export default function ActiveTaskManager() {
         const s = (secs % 60).toString().padStart(2, '0');
         return `${m}:${s}`;
     };
-
+    console.log(activeTasks, "==> active tasks");
     return (
+    
         <div className="fixed top-4 right-4 z-50 flex flex-col items-end">
             <button
                 onClick={() => setOpen(o => !o)}
