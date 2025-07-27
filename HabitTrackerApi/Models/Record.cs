@@ -17,9 +17,10 @@ namespace HabitTrackerApi.Models
         public User User { get; set; } = null!;
 
         [Required]
-        public Guid HabitId { get; set; } // Changed from TaskId
+        public Guid HabitId { get; set; }
+
         [ForeignKey("HabitId")]
-        public Habit Habit { get; set; } = null!; // Changed from Task
+        public Habit Habit { get; set; } = null!;
 
         [Required]
         public DateTime? StartTime { get; set; }
