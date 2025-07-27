@@ -1,10 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { FloatingParticles } from '../component/ThreeBackground';
 import { useScroll, ScrollControls, Scroll } from '@react-three/drei';
-import HeroContent from '../component/HeroContent';
+import HeroText from '../component/HeroText';
+import HeroButtons from '../component/HeroButtons';
 import { Canvas } from '@react-three/fiber';
 import { useFrame } from '@react-three/fiber';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
 
 const cardVariants = {
     hiddenLeft: { opacity: 0, x: -50 },
@@ -25,20 +28,11 @@ const features = [
 
 const Landing = () => {
     const [section, setSection] = useState(0);
+    const [scrollProgress, setScrollProgress] = useState(0);
     const containerRef = useRef();
     const bgColors = ['#000000', '#111111', '#222222'];
-
-    useEffect(() => {
-        const onScroll = () => {
-            if (!containerRef.current) return;
-            const scrollY = window.scrollY;
-            const vh = window.innerHeight;
-            const current = Math.min(2, Math.floor(scrollY / vh));
-            setSection(current);
-        };
-        window.addEventListener('scroll', onScroll, { passive: true });
-        return () => window.removeEventListener('scroll', onScroll);
-    }, []);
+    const { isAuthenticated, isLoading } = useAuth0();
+    const navigate = useNavigate();
 
     function SectionListener({ pages, onSectionChange }) {
         const scroll = useScroll();
@@ -51,6 +45,28 @@ const Landing = () => {
 
         return null;
     }
+    useEffect(() => {
+        const onScroll = () => {
+            if (!containerRef.current) return;
+            const scrollY = window.scrollY;
+            const vh = window.innerHeight;
+            const current = Math.min(2, Math.floor(scrollY / vh));
+            setSection(current);
+
+            // Calculate scroll progress to fade out just before "Dive Deeper" section
+            const fadeStartPoint = vh * 0.8; // Start fading at 80% of first page
+            const fadeEndPoint = vh * 0.95; // Fully hidden at 95% of first page
+            const progress = Math.max(0, Math.min(1, (scrollY - fadeStartPoint) / (fadeEndPoint - fadeStartPoint)));
+            setScrollProgress(progress);
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+
+        if (!isLoading && isAuthenticated) {
+            navigate('/task', { replace: true });
+        }
+        return () => window.removeEventListener('scroll', onScroll);
+    }, [isLoading, isAuthenticated, navigate]);
+
     return (
         <div
             ref={containerRef}
@@ -71,10 +87,12 @@ const Landing = () => {
                         html
                         style={{ width: '100%' }}
                     >
-                        <div className="absolute inset-0 h-screen flex flex-col items-center justify-center px-4">
-                            <HeroContent />
+                        {/* Hero Text - Page 1 (inside Canvas) */}
+                        <div className="absolute inset-x-0 top-0 h-screen flex flex-col items-center justify-center px-4">
+                            <HeroText />
                         </div>
 
+                        {/* Features - Page 2 */}
                         <div className="absolute inset-x-0 top-[100vh] min-h-screen flex flex-col items-center px-6 py-16 space-y-12">
                             <h2 className="text-4xl font-semibold text-white mb-6">Dive Deeper</h2>
 
@@ -126,11 +144,10 @@ const Landing = () => {
                 </ScrollControls>
             </Canvas>
 
-            <noscript>
-                <div className="absolute inset-0 bg-black flex items-center justify-center">
-                    <HeroContent />
-                </div>
-            </noscript>
+            {/* Auth0-dependent login buttons in top right corner */}
+            <div className="absolute top-4 right-4 z-10 pointer-events-auto">
+                <HeroButtons />
+            </div>
         </div>
     );
 }

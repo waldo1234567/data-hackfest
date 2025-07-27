@@ -9,6 +9,9 @@ import LandingLayout from './layouts/LandingLayout';
 import TaskPageLayout from './layouts/TaskPageLayout';
 import MindMapLayout from './layouts/MindMapLayout';
 import ReportPageLayout from './layouts/ReportPageLayout';
+import HistoryPageLayout from './layouts/HistoryPageLayout';
+import HistoryPage from './pages/HistoryPage';
+import ProtectedRoute from './ProtectedRoute';
 
 function App() {
   return (
@@ -18,16 +21,24 @@ function App() {
           <Route path='/' element={<Landing />} />
         </Route>
 
-        <Route element={<TaskPageLayout />}>
-          <Route path='/task' element={<TaskPage />} />
-        </Route>
+        <Route
+          element={<ProtectedRoute />}
+        >
+          <Route element={<TaskPageLayout />}>
+            <Route path='/task' element={<TaskPage />} />
+          </Route>
 
-        <Route element={<MindMapLayout />}>
-          <Route path='/mindmap' element={<MindMap />} />
-        </Route>
+          <Route element={<MindMapLayout />}>
+            <Route path='/mindmap' element={<MindMap />} />
+          </Route>
 
-        <Route element={<ReportPageLayout />}>
-          <Route path='/report' element={<ReportPage />} />
+          <Route element={<ReportPageLayout />}>
+            <Route path='/report' element={<ReportPage />} />
+          </Route>
+
+          <Route element={<HistoryPageLayout />}>
+            <Route path='/history' element={<HistoryPage />} />
+          </Route>
         </Route>
       </Routes>
     </>

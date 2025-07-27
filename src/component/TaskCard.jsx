@@ -15,8 +15,8 @@ const cardVariants = {
 export default function TaskCard({ task, accepted, onAccept, index }) {
     const { acceptTask } = useTask();
     const handleAccept = () => {
-        acceptTask({ id: task.id, title: task.title });
-        onAccept(); // existing logic
+        acceptTask({ id: task.id, title: task.name });
+        onAccept(); 
     };
     return (
         <motion.div
@@ -31,9 +31,9 @@ export default function TaskCard({ task, accepted, onAccept, index }) {
       `}
         >
             <div>
-                <h3 className="text-2xl font-semibold mb-4">{task.title}</h3>
+                <h3 className="text-2xl font-semibold mb-4">{task.name}</h3>
                 <hr className="border-gray-400 mb-4" />
-                <p className="text-gray-600 mb-4 p-6">{task.desc}</p>
+                <p className="text-gray-600 mb-4 p-6">{task.description}</p>
             </div>
             <button
                 onClick={handleAccept}

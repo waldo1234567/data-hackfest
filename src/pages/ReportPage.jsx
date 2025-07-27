@@ -4,16 +4,45 @@ import {
     BarChart, Bar, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import ChartCard from '../component/ChartCard';
-import { stats_mock } from '../data/mock_data';
+import { fetchStatistics } from '../api/fetchApi';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-
+import Loader from '../component/Loader';
+import { useAuth0 } from "@auth0/auth0-react";
 
 const ReportPage = () => {
-    const [data, setData] = useState(stats_mock);
+    const [data, setData] = useState();
+    const [loading, setLoading] = useState(true);
+    const { getAccessTokenSilently } = useAuth0();
+    useEffect(() => {
+        const getData = async () => {
+            const token = await getAccessTokenSilently({
+                audience: import.meta.env.VITE_AUDIENCE
+            })
+            try {
+                const response = await fetchStatistics(token);
+                console.log(response);
+                setData(response);
+            } catch (error) {
+                console.error(error);
+            }
+            finally {
+                setLoading(false);
+            }
+        }
 
-    const { overview, timelineData, habitBreakdown, AIOverview } = data;
+        getData();
+    }, [])
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-black text-white">
+                <Loader />
+            </div>
+        );
+    }
+
+    const { overview, timelineData, habitBreakdown, aiInsights } = data;
 
     const completionsData = timelineData.map(d => ({
         period: d.period,
@@ -62,7 +91,7 @@ const ReportPage = () => {
                     </LineChart>
                 </ResponsiveContainer>
             ),
-            overview: AIOverview[0],
+            overview: aiInsights[0],
             reverse: false
         },
         {
@@ -70,7 +99,19 @@ const ReportPage = () => {
             component: (
                 <ResponsiveContainer width="100%" height={250}>
                     <LineChart data={durationData}>
-                        <XAxis dataKey="period" tick={{ fill: '#fff' }} />
+                        <XAxis
+                            dataKey="period"
+                            tick={{ fill: '#fff' }}
+                            interval={0}
+                            angle={-30}
+                            textAnchor="end"
+                            height={60}
+                            tickFormatter={str => {
+                                return str.length > 12
+                                    ? str.slice(0, 12) + '…'
+                                    : str;
+                            }}
+                        />
                         <YAxis tick={{ fill: '#fff' }} />
                         <Tooltip contentStyle={{ backgroundColor: '#111', border: 'none' }} itemStyle={{ color: '#fff' }} />
                         <Line
@@ -86,28 +127,46 @@ const ReportPage = () => {
                     </LineChart>
                 </ResponsiveContainer>
             ),
-            overview: AIOverview[1],
+            overview: aiInsights[1],
             reverse: false
         },
         {
             title: 'Habit Frequency',
             component: (
-                <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={frequencyData}>
-                        <XAxis dataKey="name" tick={{ fill: '#fff' }} />
-                        <YAxis tick={{ fill: '#fff' }} />
-                        <Tooltip contentStyle={{ backgroundColor: '#111', border: 'none' }} itemStyle={{ color: '#fff' }} />
-                        <Bar
-                            dataKey="frequency"
-                            fill="#fff"
-                            isAnimationActive
-                            animationDuration={1200}
-                            animationEasing="ease-out"
-                        />
-                    </BarChart>
-                </ResponsiveContainer>
+                <div style={{ overflowX: 'auto' }}>
+                    <div style={{ width: `${frequencyData.length * 60}px` }}>
+                        <ResponsiveContainer width="100%" height={350}>
+
+                            <BarChart data={frequencyData}>
+                                <XAxis
+                                    dataKey="name"
+                                    tick={{ fill: '#fff' }}
+                                    interval={0}
+                                    angle={-30}
+                                    textAnchor="end"
+                                    height={60}
+                                    tickFormatter={str => {
+                                        return str.length > 12
+                                            ? str.slice(0, 12) + '…'
+                                            : str;
+                                    }}
+                                />
+                                <YAxis tick={{ fill: '#fff' }} />
+                                <Tooltip contentStyle={{ backgroundColor: '#111', border: 'none' }} itemStyle={{ color: '#fff' }} />
+                                <Bar
+                                    dataKey="frequency"
+                                    fill="#fff"
+                                    isAnimationActive
+                                    animationDuration={1200}
+                                    animationEasing="ease-out"
+                                />
+                            </BarChart>
+
+                        </ResponsiveContainer>
+                    </div>
+                </div>
             ),
-            overview: AIOverview[2],
+            overview: aiInsights[2],
             reverse: false
         },
         {
@@ -135,7 +194,7 @@ const ReportPage = () => {
                     </PieChart>
                 </ResponsiveContainer>
             ),
-            overview: AIOverview[3],
+            overview: aiInsights[3],
             reverse: false
         }
     ];
@@ -190,7 +249,6 @@ const ReportPage = () => {
                         key={i}
                         className="h-screen snap-start flex flex-col items-center justify-center p-6 gap-8"
                     >
-                        {/* 1) Chart at the top */}
                         <motion.div
                             className="w-full max-w-4xl"
                             initial={chartVars.initial}
@@ -206,7 +264,6 @@ const ReportPage = () => {
                             </ChartCard>
                         </motion.div>
 
-                        {/* 2) Text underneath */}
                         <motion.div
                             className="w-full max-w-5xl p-4"
                             initial={textVars.initial}

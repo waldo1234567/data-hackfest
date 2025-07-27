@@ -1,16 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import TaskCard from '../component/TaskCard';
-import BottomNav from '../component/BottomNav';
-
-const initialTasks = [
-    { id: 1, title: 'Drink 2L Water', desc: 'Stay hydrated all day', accepted: false },
-    { id: 2, title: 'Read 30 mins', desc: 'Read a chapter of your book', accepted: false },
-    { id: 3, title: 'Meditate', desc: '5-minute morning meditation', accepted: false },
-];
-
+import { fetchHabits } from '../api/fetchApi';
+import { useAuth0 } from "@auth0/auth0-react";
 
 const TaskPage = () => {
     const [acceptedIds, setAcceptedIds] = useState(new Set());
+    const [tasks, setTasks] = useState([]);
+    const { getAccessTokenSilently } = useAuth0();
+
+
+    useEffect(() => {
+        const getData = async () => {
+            const token = await getAccessTokenSilently({
+                audience: import.meta.env.VITE_AUDIENCE
+            })
+            try {
+                const data = await fetchHabits(token);
+                console.log(data.habits);
+                setTasks(data.habits);
+            } catch (error) {
+                console.log(error);
+            }
+        }
+
+        getData();
+    }, [])
 
     const handleAccept = id => {
         setAcceptedIds(new Set(acceptedIds).add(id));
@@ -25,7 +39,7 @@ const TaskPage = () => {
 
             <main className="flex-1 overflow-auto p-6">
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                    {initialTasks.map((task, i) => (
+                    {tasks.map((task, i) => (
                         <TaskCard
                             key={task.id}
                             task={task}
